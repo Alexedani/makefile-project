@@ -12,8 +12,12 @@ int main(void)
 {
     int result_add = add(5, 3);
     int result_subtract = subtract(5, 3);
+    int result_product = product(5, 3);
+    int result_badSum = badSum(1, 1);
     printf("Addition Result: %d\n", result_add);
     printf("Subtraction Result: %d\n", result_subtract);
+    printf("Multiplication Result: %d\n", result_product);
+    printf("Bad Sum result: %d\n", result_badSum);
     char *greeting = get_greeting("World");
     if (greeting) {
         printf("%s\n", greeting);
