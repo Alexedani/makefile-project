@@ -10,6 +10,15 @@
 
 int main(void)
 {
+
+    //These variables are EVIL!!
+    //Dont trust them 
+    
+    // int *evilVariable = NULL;
+    // *evilVariable = 1;
+
+    // int *evilVariable2 = malloc(100);
+
     int result_add = add(5, 3);
     int result_subtract = subtract(5, 3);
     int result_product = product(5, 3);

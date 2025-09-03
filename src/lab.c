@@ -15,6 +15,7 @@ int product(int a, int b) {
 }
 
 int badSum(int a, int b) {
+  // int *evilVariable = malloc(100);
   return (a + b) + 1;
 }
 
