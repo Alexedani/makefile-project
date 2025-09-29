@@ -83,9 +83,46 @@ size_t list_size(const List *list);
 
 /**
  * @brief Check if the list is empty.
- * @param list Pointer to the list.
- * @return true if the list is empty, false otherwise.
+ * @param list Pointer to the list
+ * @return true if the list is empty, false otherwise
  */
 bool list_is_empty(const List *list);
+
+/**
+ * @brief Sort a subrange of the list in-place
+ * @param list The list to sort
+ * @param start Starting index
+ * @param end Ending index 
+ * @param cmp Comparison function
+ * @return 0 on success, non-zero on failure
+ */
+typedef int (*CompareFunc)(const void *a, const void *b);
+
+int sort(List *list, size_t start, size_t end, CompareFunc cmp);
+
+/**
+ * @brief Merge two sorted lists into a single sorted list.
+ * @param a First list.
+ * @param b Second list.
+ * @param cmp Comparison function.
+ * @return A new merged list.
+ */
+List *merge(List *a, List *b, CompareFunc cmp);
+
+/**
+ * @brief Compare integers.
+ */
+int compare_int(const void *a, const void *b);
+
+/**
+ * @brief Compare strings.
+ */
+int compare_str(const void *a, const void *b);
+
+/**
+ * @brief Check if a list is sorted.
+ */
+bool is_sorted(const List *list, CompareFunc cmp);
+
 
 #endif // LAB_H

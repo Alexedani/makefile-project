@@ -1,30 +1,15 @@
-# Project 1 – Simple Linked List
+# Project 2 
 
-## Overview
-This project implements a **circular doubly linked list with a sentinel node** in C.  
-It is the first project in the course and serves as a warm-up to practice:
-- Pointers and dynamic memory management
-- Structs and modular design in C
-- Writing portable code that compiles in both **GitHub Codespaces** and **Onyx**
-- Unit testing with the Unity framework
+- Name: Alex Daniluc
+- Email: alexanderdaniluc@u.boisestate.edu
+- Class: 452-002
 
+## Known Bugs or Issues
 
----
+TODO: 
 
-## Features
-- Circular doubly linked list with a sentinel node
-- Generic storage (`void *` for any data type)
-- Append, insert, remove, and get functions
-- Query functions: size, is_empty
-- Optional `FreeFunc` to safely free stored elements
-- Thorough unit testing with Unity
+There were 2 warnings I was getting that had to do with type conversion which is something im still not very familiar with in C
 
----
+## Experience
 
-## Build and Run
-
-From the root of the repository:
-
-### Build everything
-```bash
-make all
+A lot of this project was reviewing and remembering concepts from cs253 in regards to programming in C. For the most part, the project was pretty straight forward and a good learning experience for working with threads. For the parts which I was not able to understand, I was able to use resources online such as youtube and generative AI to help me.
