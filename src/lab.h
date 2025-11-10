@@ -1,91 +1,71 @@
 #ifndef LAB_H
 #define LAB_H
-
+#include <stdlib.h>
 #include <stdbool.h>
-#include <stddef.h>
 
-/**
- * @file lab.h
- * @brief Header file for a generic list data structure supporting multiple implementations.
- */
-typedef struct List List;
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
-/**
- * @enum ListType
- * @brief Enumeration for selecting the list implementation type.
- */
-typedef enum {
-    LIST_LINKED_SENTINEL
-} ListType;
+    /**
+     * @brief opaque type definition for a queue
+     */
+    typedef struct queue *queue_t;
 
-/**
- * @typedef FreeFunc
- * @brief Function pointer type for freeing elements. If NULL, no action is taken.
- * Must be provided by the user when destroying the list or removing elements.
- *
- */
-typedef void (*FreeFunc)(void *);
+    /**
+     * @brief Initialize a new queue
+     *
+     * @param capacity the maximum capacity of the queue
+     * @return A fully initialized queue
+     */
+    queue_t queue_init(int capacity);
 
+    /**
+     * @brief Frees all memory and related data signals all waiting threads.
+     *
+     * @param q a queue to free
+     */
+    void queue_destroy(queue_t q);
 
-/**
- * @brief Create a new list of the specified type.
- * @param type The type of list to create (e.g., LIST_LINKED_SENTINEL).
- * @return Pointer to the newly created list, or NULL on failure.
- */
-List *list_create(ListType type);
+    /**
+     * @brief Adds an element to the back of the queue
+     *
+     * @param q the queue
+     * @param data the data to add
+     */
+    void enqueue(queue_t q, void *data);
 
-/**
- * @brief Destroy the list and free all associated memory.
- * @param list Pointer to the list to destroy.
- * @param free_func Function to free individual elements. If NULL, elements are not freed.
- */
-void list_destroy(List *list, FreeFunc free_func);
+    /**
+     * @brief Removes the first element in the queue.
+     *
+     * @param q the queue
+     */
+    void *dequeue(queue_t q);
 
-/**
- * @brief Append an element to the end of the list.
- * @param list Pointer to the list.
- * @param data Pointer to the data to append.
- * @return true on success, false on failure.
- */
-bool list_append(List *list, void *data);
+    /**
+     * @brief Set the shutdown flag in the queue so all threads can
+     * complete and exit properly
+     *
+     * @param q The queue
+     */
+   void queue_shutdown(queue_t q);
 
-/**
- * @brief Insert an element at a specific index.
- * @param list Pointer to the list.
- * @param index Index at which to insert the element.
- * @param data Pointer to the data to insert.
- * @return true on success, false on failure (e.g., index out of bounds).
- */
-bool list_insert(List *list, size_t index, void *data);
+    /**
+     * @brief Returns true is the queue is empty
+     *
+     * @param q the queue
+     */
+    bool is_empty(queue_t q);
 
-/**
- * @brief Remove an element at a specific index.
- * @param list Pointer to the list.
- * @param index Index of the element to remove.
- * @return Pointer to the element, or NULL if index is out of bounds.
- */
-void *list_remove(List *list, size_t index);
+    /**
+     * @brief
+     *
+     * @param q The queue
+     */
+    bool is_shutdown(queue_t q);
 
-/**
- * @brief Get a pointer the element at a specific index.
- * @param list Pointer to the list.
- * @param index Index of the element to retrieve.
- * @return Pointer to the element, or NULL if index is out of bounds.
- */
-void *list_get(const List *list, size_t index);
-
-/**
- * @brief Get the current size of the list.
- * @param list Pointer to the list.
- * @return The number of elements in the list.
- */
-size_t list_size(const List *list);
-
-/**
- * @brief Check if the list is empty.
- * @param list Pointer to the list.
- * @return true if the list is empty, false otherwise.
- */
-bool list_is_empty(const List *list);
-
-#endif // LAB_H
+#ifdef __cplusplus
+} // extern "C"
+#endif
+#endif

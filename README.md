@@ -1,30 +1,14 @@
-# Project 1 – Simple Linked List
+# Project 4 - Bounded Queue
 
-## Overview
-This project implements a **circular doubly linked list with a sentinel node** in C.  
-It is the first project in the course and serves as a warm-up to practice:
-- Pointers and dynamic memory management
-- Structs and modular design in C
-- Writing portable code that compiles in both **GitHub Codespaces** and **Onyx**
-- Unit testing with the Unity framework
+- Name: Alexander Daniluc
+- Email: alexanderdaniluc@u.boisestate.edu
+- Class: 452-001
+
+## Known Bugs or Issues
+
+The only issue I ran into was trying to get full coverage. 
+
+## Experience
 
 
----
-
-## Features
-- Circular doubly linked list with a sentinel node
-- Generic storage (`void *` for any data type)
-- Append, insert, remove, and get functions
-- Query functions: size, is_empty
-- Optional `FreeFunc` to safely free stored elements
-- Thorough unit testing with Unity
-
----
-
-## Build and Run
-
-From the root of the repository:
-
-### Build everything
-```bash
-make all
+This project was harder than I expected at first. Getting the main queue logic working wasn’t too bad, but getting full test coverage was a challenge. I had to learn a lot about how threads block and wake up, and how to write tests that reliably trigger certain code paths. The hardest part of this project for me was getting full test coverage which I wasn't able to do but I was able to get close. 

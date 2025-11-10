@@ -1,168 +1,212 @@
 #include "lab.h"
-#include <stdlib.h>
-#include <stdio.h>
+#include <pthread.h>
+#include <errno.h>
 
-/**
- * @file lab.c
- * @brief Implementation of a circular doubly linked list with a sentinel node.
- */
+/* Opaque struct matches typedef in lab.h */
+struct queue {
+    int capacity;
+    int count;
+    int head;
+    int tail;
+    int shutdown;             /* 0 = running, 1 = shutting down */
 
-/* 
- * Internal node structure for the list
- */
-typedef struct Node {
-    void *data;
-    struct Node *next;
-    struct Node *prev;
-} Node;
+    void **buf;               /* circular buffer of void* */
 
-/* 
- * The List structure definition (hidden from lab.h).
- */
-struct List {
-    ListType type;
-    size_t size;
-    Node *sentinel;
+    pthread_mutex_t mtx;      /* monitor lock */
+    pthread_cond_t  not_full; /* signaled when space is available */
+    pthread_cond_t  not_empty;/* signaled when data is available */
 };
 
+/* Internal helper: next index in circular buffer */
 /**
- * Create a new list of the specified type.
  * AI Use: Written By AI
  */
-List *list_create(ListType type) {
-    List *list = malloc(sizeof(List));
-    if (!list) return NULL;
+static inline int next_idx(int i, int cap) {
+    return (i + 1) % cap;
+}
 
-    Node *sentinel = malloc(sizeof(Node));
-    if (!sentinel) {
-        free(list);
+/**
+ * Initialize a new queue with fixed capacity.
+ * AI Use: Written By AI
+ */
+queue_t queue_init(int capacity) {
+    if (capacity <= 0) return NULL;
+
+    struct queue *q = (struct queue *)calloc(1, sizeof(*q));
+    if (!q) return NULL;
+
+    q->buf = (void **)calloc((size_t)capacity, sizeof(void *));
+    if (!q->buf) {
+        free(q);
         return NULL;
     }
 
-    sentinel->data = NULL;
-    sentinel->next = sentinel;
-    sentinel->prev = sentinel;
+    q->capacity = capacity;
+    q->count = 0;
+    q->head = 0;
+    q->tail = 0;
+    q->shutdown = 0;
 
-    list->type = type;
-    list->size = 0;
-    list->sentinel = sentinel;
-    return list;
-}
-
-/**
- * Destroy the list and free all associated memory.
- * AI Use: Written By AI
- */
-void list_destroy(List *list, FreeFunc free_func) {
-    if (!list) return;
-
-    Node *cur = list->sentinel->next;
-    while (cur != list->sentinel) {
-        Node *next = cur->next;
-        if (free_func) free_func(cur->data);
-        free(cur);
-        cur = next;
+    /* default pthread attributes are fine (process-private) */
+    if (pthread_mutex_init(&q->mtx, NULL) != 0) {
+        free(q->buf);
+        free(q);
+        return NULL;
+    }
+    if (pthread_cond_init(&q->not_full, NULL) != 0) {
+        pthread_mutex_destroy(&q->mtx);
+        free(q->buf);
+        free(q);
+        return NULL;
+    }
+    if (pthread_cond_init(&q->not_empty, NULL) != 0) {
+        pthread_cond_destroy(&q->not_full);
+        pthread_mutex_destroy(&q->mtx);
+        free(q->buf);
+        free(q);
+        return NULL;
     }
 
-    free(list->sentinel);
-    free(list);
+    return (queue_t)q;
 }
 
 /**
- * Append an element to the end of the list.
+ * Frees all memory; wakes any waiting threads first.
+ * Safe to call after queue_shutdown() or as last cleanup.
  * AI Use: Written By AI
  */
-bool list_append(List *list, void *data) {
-    if (!list) return false;
+void queue_destroy(queue_t qh) {
+    if (!qh) return;
+    struct queue *q = (struct queue *)qh;
 
-    Node *node = malloc(sizeof(Node));
-    if (!node) return false;
-    node->data = data;
+    pthread_mutex_lock(&q->mtx);
+    q->shutdown = 1;
+    pthread_cond_broadcast(&q->not_full);
+    pthread_cond_broadcast(&q->not_empty);
+    pthread_mutex_unlock(&q->mtx);
 
-    Node *tail = list->sentinel->prev;
+    pthread_cond_destroy(&q->not_full);
+    pthread_cond_destroy(&q->not_empty);
+    pthread_mutex_destroy(&q->mtx);
 
-    tail->next = node;
-    node->prev = tail;
-    node->next = list->sentinel;
-    list->sentinel->prev = node;
-
-    list->size++;
-    return true;
+    /* NOTE: At this point, your main has joined all threads and freed
+       any dequeued items. Any residual pointers in buf are application-
+       managed; per your driver, producers stop before shutdown. */
+    free(q->buf);
+    free(q);
 }
 
 /**
- * Insert an element at a specific index.
+ * Enqueue an element, blocking while full.
+ * If queue is shutdown, returns immediately without enqueuing.
+ * (Your driver never enqueues post-shutdown; this prevents deadlock if it did.)
  * AI Use: Written By AI
  */
-bool list_insert(List *list, size_t index, void *data) {
-    if (!list || index > list->size) return false;
+void enqueue(queue_t qh, void *data) {
+    if (!qh) return;
+    struct queue *q = (struct queue *)qh;
 
-    Node *node = malloc(sizeof(Node));
-    if (!node) return false;
-    node->data = data;
+    pthread_mutex_lock(&q->mtx);
 
-    Node *cur = list->sentinel;
-    for (size_t i = 0; i < index; i++) {
-        cur = cur->next;
+    /* Block while full, but never block if shutdown was requested. */
+    while (!q->shutdown && q->count == q->capacity) {
+        pthread_cond_wait(&q->not_full, &q->mtx);
+    }
+    if (q->shutdown) {
+        /* Drop item on the floor; the driver shuts down only after producers finish,
+           so this path is just a safety valve. */
+        pthread_mutex_unlock(&q->mtx);
+        return;
     }
 
-    Node *next = cur->next;
-    cur->next = node;
-    node->prev = cur;
-    node->next = next;
-    next->prev = node;
+    q->buf[q->tail] = data;
+    q->tail = next_idx(q->tail, q->capacity);
+    q->count++;
 
-    list->size++;
-    return true;
+    /* Wake one consumer. Using signal preserves throughput; broadcast also okay. */
+    pthread_cond_signal(&q->not_empty);
+    pthread_mutex_unlock(&q->mtx);
 }
 
 /**
- * Remove an element at a specific index.
+ * Dequeue an element, blocking while empty.
+ * After shutdown: drains remaining items; once empty, returns NULL.
  * AI Use: Written By AI
  */
-void *list_remove(List *list, size_t index) {
-    if (!list || index >= list->size) return NULL;
+void *dequeue(queue_t qh) {
+    if (!qh) return NULL;
+    struct queue *q = (struct queue *)qh;
 
-    Node *cur = list->sentinel->next;
-    for (size_t i = 0; i < index; i++) {
-        cur = cur->next;
+    pthread_mutex_lock(&q->mtx);
+
+    /* Block while empty and not shutdown */
+    while (q->count == 0 && !q->shutdown) {
+        pthread_cond_wait(&q->not_empty, &q->mtx);
     }
 
-    void *data = cur->data;
-    cur->prev->next = cur->next;
-    cur->next->prev = cur->prev;
-    free(cur);
-
-    list->size--;
-    return data;
-}
-
-/**
- * Get a pointer to the element at a specific index.
- * AI Use: Written By AI
- */
-void *list_get(const List *list, size_t index) {
-    if (!list || index >= list->size) return NULL;
-
-    Node *cur = list->sentinel->next;
-    for (size_t i = 0; i < index; i++) {
-        cur = cur->next;
+    /* If empty and shutdown, return NULL to let consumers exit */
+    if (q->count == 0 && q->shutdown) {
+        pthread_mutex_unlock(&q->mtx);
+        return NULL;
     }
-    return cur->data;
+
+    /* Normal dequeue */
+    void *item = q->buf[q->head];
+    q->buf[q->head] = NULL; /* helps ASan/diagnostics */
+    q->head = next_idx(q->head, q->capacity);
+    q->count--;
+
+    /* Make space visible to producers */
+    pthread_cond_signal(&q->not_full);
+    pthread_mutex_unlock(&q->mtx);
+
+    return item;
 }
 
 /**
- * Get the current size of the list.
+ * Set shutdown flag and wake all waiters.
+ * After this call:
+ *  - enqueue() returns immediately without adding new data
+ *  - dequeue() returns remaining items; once empty, returns NULL
  * AI Use: Written By AI
  */
-size_t list_size(const List *list) {
-    return list ? list->size : 0;
+void queue_shutdown(queue_t qh) {
+    if (!qh) return;
+    struct queue *q = (struct queue *)qh;
+
+    pthread_mutex_lock(&q->mtx);
+    if (!q->shutdown) {
+        q->shutdown = 1;
+        pthread_cond_broadcast(&q->not_full);
+        pthread_cond_broadcast(&q->not_empty);
+    }
+    pthread_mutex_unlock(&q->mtx);
 }
 
 /**
- * Check if the list is empty.
+ * Returns true if the queue is currently empty (snapshot).
  * AI Use: Written By AI
  */
-bool list_is_empty(const List *list) {
-    return !list || list->size == 0;
+bool is_empty(queue_t qh) {
+    if (!qh) return true;
+    struct queue *q = (struct queue *)qh;
+
+    pthread_mutex_lock(&q->mtx);
+    bool empty = (q->count == 0);
+    pthread_mutex_unlock(&q->mtx);
+    return empty;
+}
+
+/**
+ * Returns true if shutdown has been requested.
+ * AI Use: Written By AI
+ */
+bool is_shutdown(queue_t qh) {
+    if (!qh) return true;
+    struct queue *q = (struct queue *)qh;
+
+    pthread_mutex_lock(&q->mtx);
+    bool s = (q->shutdown != 0);
+    pthread_mutex_unlock(&q->mtx);
+    return s;
 }
