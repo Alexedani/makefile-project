@@ -32,6 +32,10 @@ The program leaked memory during the merge step.
 The original merge() function created a new output list but did not properly free the two sublists (left and right).
 Additionally, after the merge, the main program never destroyed those sublists.
 
+![alt text](image.png)
+
+Adding these two lines of code fixed my entire project and there aren't anymore leak issues.
+
 ### Build Output - makeall
 
 I had scored a 5/10 on this previously because I had two warnings that were being given when makeall was ran which had to do with type conversion. I have addressed these issues in main.c and there are no more warnings given.
